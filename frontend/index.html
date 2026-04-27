@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo App - EKS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { color: #333; margin-bottom: 20px; }
+    .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+    input { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 16px; }
+    button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+    button:hover { background: #0056b3; }
+    .todo-list { list-style: none; }
+    .todo-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee; }
+    .todo-item:hover { background: #f9f9f9; }
+    .todo-item input[type="checkbox"] { margin-right: 15px; width: 20px; height: 20px; cursor: pointer; }
+    .todo-item span { flex: 1; font-size: 16px; }
+    .todo-item.completed span { text-decoration: line-through; color: #999; }
+    .delete-btn { background: #dc3545; padding: 8px 16px; font-size: 14px; }
+    .delete-btn:hover { background: #c82333; }
+    .status { text-align: center; padding: 10px; margin-bottom: 20px; border-radius: 5px; }
+    .status.connected { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 Todo App on EKS</h1>
+    <div id="status" class="status"></div>
+    <div class="input-group">
+      <input type="text" id="todoInput" placeholder="What needs to be done?" />
+      <button onclick="addTodo()">Add</button>
+    </div>
+    <ul id="todoList" class="todo-list"></ul>
+  </div>
+
+  <script>
+    const API_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5000/api' 
+      : '/api';
+
+    async function checkHealth() {
+      try {
+        await fetch(API_URL.replace('/api', '/health'));
+        document.getElementById('status').innerHTML = '✅ Connected to backend';
+        document.getElementById('status').className = 'status connected';
+      } catch (e) {
+        document.getElementById('status').innerHTML = '❌ Backend not reachable';
+        document.getElementById('status').className = 'status error';
+      }
+    }
+
+    async function loadTodos() {
+      const res = await fetch(`${API_URL}/todos`);
+      const todos = await res.json();
+      const list = document.getElementById('todoList');
+      list.innerHTML = todos.map(todo => `
+        <li class="todo-item ${todo.completed ? 'completed' : ''}">
+          <input type="checkbox" ${todo.completed ? 'checked' : ''} 
+                 onchange="toggleTodo('${todo._id}', ${!todo.completed})">
+          <span>${todo.title}</span>
+          <button class="delete-btn" onclick="deleteTodo('${todo._id}')">Delete</button>
+        </li>
+      `).join('');
+    }
+
+    async function addTodo() {
+      const input = document.getElementById('todoInput');
+      if (!input.value.trim()) return;
+      await fetch(`${API_URL}/todos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: input.value })
+      });
+      input.value = '';
+      loadTodos();
+    }
+
+    async function toggleTodo(id, completed) {
+      await fetch(`${API_URL}/todos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed })
+      });
+      loadTodos();
+    }
+
+    async function deleteTodo(id) {
+      await fetch(`${API_URL}/todos/${id}`, { method: 'DELETE' });
+      loadTodos();
+    }
+
+    document.getElementById('todoInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addTodo();
+    });
+
+    checkHealth();
+    loadTodos();
+  </script>
+</body>
+</html>
